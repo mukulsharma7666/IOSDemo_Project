@@ -44,8 +44,8 @@ class ProductCell: UITableViewCell {
         priceLabel.font = UIFont.boldSystemFont(ofSize: 16)
 
         productImageView.contentMode = .scaleAspectFit
-        productImageView.clipsToBounds = true
         productImageView.layer.cornerRadius = 16
+        productImageView.clipsToBounds = true
 
         cartButton.setTitle("Add to Cart", for: .normal)
         cartButton.setTitleColor(.white, for: .normal)
