@@ -13,48 +13,75 @@ enum FilterType {
     case unfavorites
 }
 
-class ProductListViewModel {
-    private(set) var allProducts: [Product] = []
+class ProductViewModel {
+    private(set) var products: [Product] = []
     private(set) var filteredProducts: [Product] = []
-    private(set) var currentFilter: FilterType = .all
-    var onDataUpdate: (() -> Void)?
+    private var currentPage = 0
+    private let pageSize = 20
+    var isLoading = false
 
-    init() {
-        // Simulate loading delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.loadMockProducts()
+    var onProductsUpdated: (() -> Void)?
+
+    enum FilterType {
+        case all, favorites, unfavorites
+    }
+
+    private var currentFilter: FilterType = .all
+
+    func loadInitialData() {
+        products = (1...100).map {
+            Product(id: $0, name: "Men Puma Softfoam Smashic Unisex Sneakers \($0)", imageName: "https://encrypted-tbn1.gstatic.com/shopping?q=tbn:ANd9GcQb0qTbT-R7xXrtv2O73Q3_QoSgEs7udZCNAp6coYvmDsxWMOIWf-Wg9BHvMMym6GEcHwACTlXi2cyIREmlIxXFHjgyxf2sMxTiHUMaE0_WfIflDLLCzz_S", price: "$\($0+5)", isFavorite: false)
+        }
+        paginate()
+    }
+
+    func paginate() {
+        guard !isLoading else { return }
+        isLoading = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            let start = self.currentPage * self.pageSize
+            let end = min(start + self.pageSize, self.products.count)
+            guard start < end else { return }
+
+            let newItems = Array(self.products[start..<end])
+            if self.currentPage == 0 {
+                self.filteredProducts = newItems
+            } else {
+                self.filteredProducts.append(contentsOf: newItems)
+            }
+            self.currentPage += 1
+            self.isLoading = false
+            self.onProductsUpdated?()
         }
     }
 
-    func loadMockProducts() {
-        allProducts = (1...120).map {
-            Product(id: $0, name: "Men Campus Mike lace-up Running Shoes \($0)", imageName: "https://encrypted-tbn1.gstatic.com/shopping?q=tbn:ANd9GcQb0qTbT-R7xXrtv2O73Q3_QoSgEs7udZCNAp6coYvmDsxWMOIWf-Wg9BHvMMym6GEcHwACTlXi2cyIREmlIxXFHjgyxf2sMxTiHUMaE0_WfIflDLLCzz_S", price: "\($0+5)")
+    func toggleFavorite(at index: Int) {
+        let productId = filteredProducts[index].id
+        if let originalIndex = products.firstIndex(where: { $0.id == productId }) {
+            products[originalIndex].isFavorite.toggle()
+            filteredProducts[index].isFavorite.toggle()
+            onProductsUpdated?()
         }
-        applyFilter(.all)
     }
 
-    func applyFilter(_ type: FilterType) {
-        currentFilter = type
-        let favs = FavoritesManager.shared.getFavorites()
-
-        switch type {
+    func applyFilter(_ filter: FilterType) {
+        currentPage = 0
+        currentFilter = filter
+        switch filter {
         case .all:
-            filteredProducts = allProducts
+            filteredProducts = Array(products.prefix(pageSize))
         case .favorites:
-            filteredProducts = allProducts.filter { favs.contains($0.id) }
+            filteredProducts = products.filter { $0.isFavorite }
         case .unfavorites:
-            filteredProducts = allProducts.filter { !favs.contains($0.id) }
+            filteredProducts = products.filter { !$0.isFavorite }
         }
-
-        onDataUpdate?()
+        onProductsUpdated?()
     }
 
-    func toggleFavorite(product: Product) {
-        FavoritesManager.shared.toggleFavorite(id: product.id)
-        applyFilter(currentFilter)
-    }
-
-    func isFavorite(product: Product) -> Bool {
-        FavoritesManager.shared.isFavorite(id: product.id)
+    func resetPagination() {
+        currentPage = 0
+        filteredProducts.removeAll()
+        paginate()
     }
 }
